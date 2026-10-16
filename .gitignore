@@ -2,3 +2,10 @@ node_modules/
 .sites-runtime/
 *.log
 private-data/
+dist/
+.next/
+.wrangler/
+.sites-runtime/
+*.tsbuildinfo
+.env*
+!.env.example
