@@ -1,0 +1,16 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const elements=new Map();const document={querySelector(s){if(!elements.has(s))elements.set(s,{value:'',dataset:{},style:{},classList:{toggle(){}},setAttribute(){}});return elements.get(s);},querySelectorAll(){return[];}};
+const context=vm.createContext({document,localStorage:{getItem(){return null;}},console,Intl,Date,setTimeout,clearTimeout});
+vm.runInContext(fs.readFileSync('dist/app.js','utf8').replace(/render\(\);\s*$/,''),context);
+const run=src=>vm.runInContext(src,context);
+assert.equal(run("parseCSV('start,end,kwh,total\\n2026-01-01,2026-01-31,650,120.50')[0].total"),120.5);
+assert.equal(run("days({start:'2026-02-01',end:'2026-02-28'})"),28);
+assert.equal(run("value({start:'2026-02-01',end:'2026-02-28',total:112,kwh:560},'daily')"),4);
+assert.equal(run("value({total:112,kwh:560},'rate')"),.2);
+assert.equal(run("value({total:null,kwh:560},'rate')"),null);
+assert.equal(run("parseCSV('start,end,kwh,total\\n2026-01-01,2026-01-31,,0')[0].kwh"),null);
+assert.throws(()=>run("parseCSV('start,end,kwh,total\\n2026-02-30,2026-03-01,10,20')"));
+assert.throws(()=>run("parseCSV('start,end,kwh,total\\n2026-02-01,2026-02-28,-10,20')"));
+assert.throws(()=>run("parseCSV('start,end,kwh,total\\n2026-02-01,2026-02-28,,')"));
+assert.equal(run("parseCSV('start,end,kwh,total\\r\\n\"2026-01-01\",2026-01-31,650,120.50')[0].kwh"),650);
+console.log('10 import and calculation checks passed.');

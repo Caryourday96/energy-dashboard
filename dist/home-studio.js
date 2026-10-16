@@ -1,0 +1,23 @@
+'use strict';
+const previousApply=applyPrefs;
+applyPrefs=function(){const requested=prefs.layout;previousApply();if(requested==='home'){prefs.layout='home';document.body.dataset.layout='home';$('#layout').value='home';}renderHome();};
+const previousRender=render;
+render=function(){previousRender();renderHome();};
+$('#range').onchange=render;
+$('#top-import').onclick=openImport;
+function renderHome(){const b=bills.at(-1),prior=bills.at(-2);$('#home-period').textContent=b?`HYDRO OTTAWA / ${label(b)}${isDemo?' / DEMO DATA':''}`:'HYDRO OTTAWA / IMPORT YOUR FIRST BILL';const daily=b&&b.kwh!=null?b.kwh/days(b):null;const values=[['Latest bill',b?money(b.total):'—',b?days(b)+' day billing period':'Import a bill to begin'],['Electricity used',b?num(b.kwh)+' <small>kWh</small>':'—',prior&&b?.kwh!=null&&prior.kwh>0?((b.kwh-prior.kwh)/prior.kwh*100>=0?'+':'')+num((b.kwh-prior.kwh)/prior.kwh*100)+'% vs previous bill':'Reported consumption'],['Daily average',num(daily)+' <small>kWh</small>','Adjusted for period length']];$('#home-kpis').innerHTML=values.map(([name,v,note])=>`<div class="home-kpi"><span>${name}</span><strong>${v}</strong><small>${esc(note)}</small></div>`).join('');const samples=bills.filter(x=>x.kwh!=null).map(x=>x.kwh/days(x));if(daily==null||!samples.length){$('#usage-gauge').innerHTML='<p class="muted">Import usage to see your daily average.</p>';$('#gauge-summary').innerHTML='';return;}const peak=Math.max(...samples),min=Math.min(...samples),avg=samples.reduce((a,b)=>a+b,0)/samples.length;const ratio=peak?daily/peak:0;let ticks='';for(let i=0;i<72;i++){const angle=(i*5-90)*Math.PI/180,outer=96,inner=i%6===0?87:91,color=i/72<=ratio?'var(--accent)':'var(--line)';ticks+=`<line x1="${110+Math.cos(angle)*inner}" y1="${110+Math.sin(angle)*inner}" x2="${110+Math.cos(angle)*outer}" y2="${110+Math.sin(angle)*outer}" stroke="${color}" stroke-width="${i%6===0?1.7:1}"/>`;}
+$('#usage-gauge').innerHTML=`<svg viewBox="0 0 220 220" role="img" aria-label="Latest daily use ${num(daily)} kWh, ${num(ratio*100)} percent of highest recorded daily bill average">${ticks}<circle cx="110" cy="110" r="76" fill="none" stroke="var(--line)" stroke-width=".5"/><text x="110" y="86" text-anchor="middle" class="gauge-label">Daily use</text><text x="110" y="119" text-anchor="middle" class="gauge-number">${num(daily)}</text><text x="110" y="139" text-anchor="middle" class="gauge-label">kWh / day</text></svg>`;$('#gauge-summary').innerHTML=[['Lowest',min],['Highest',peak],['Average',avg]].map(([title,v])=>`<div>${title}<strong>${num(v)} kWh</strong></div>`).join('')+`<p class="gauge-note" style="grid-column:1/-1">Ring shows latest use relative to your highest bill’s daily average.</p>`;
+}
+const baseDrawChart=drawChart;
+drawChart=function(data){baseDrawChart(data);if(prefs.layout!=='home')return;const svg=$('#chart svg');if(!svg)return;const points=data.map(b=>value(b,prefs.metric)).filter(v=>v!=null);if(!points.length)return;const max=Math.max(...points,1)*1.15;const mean=points.reduce((a,b)=>a+b,0)/points.length;const y=12+185-mean/max*185;const line=document.createElementNS('http://www.w3.org/2000/svg','line');for(const[k,v]of Object.entries({x1:57,x2:785,y1:y,y2:y,stroke:'#a4b55e','stroke-width':1.5,'stroke-dasharray':'5 5'}))line.setAttribute(k,v);const title=document.createElementNS('http://www.w3.org/2000/svg','title');title.textContent='Average: '+format(mean,prefs.metric);line.appendChild(title);svg.appendChild(line);$('#legend-text').textContent+=' · dashed: period average';};
+const dashboardLayouts=['home','studio','analytics','command','classic'];
+const shuffleLabel=document.createElement('label');shuffleLabel.className='shuffle-toggle';
+shuffleLabel.innerHTML='<input type="checkbox" id="shuffle-open"> Shuffle on open';
+$('.top-controls').prepend(shuffleLabel);
+if(prefs.shuffleOnOpen==null)prefs.shuffleOnOpen=true;
+$('#shuffle-open').checked=prefs.shuffleOnOpen;
+$('#shuffle-open').onchange=e=>{prefs.shuffleOnOpen=e.target.checked;savePrefs();toast(prefs.shuffleOnOpen?'A different layout will greet you next time.':'Your selected layout will stay in place.');};
+if(prefs.shuffleOnOpen){const previous=prefs.lastOpenedLayout||prefs.layout;const choices=dashboardLayouts.filter(x=>x!==previous);prefs.layout=choices[Math.floor(Math.random()*choices.length)];prefs.lastOpenedLayout=prefs.layout;savePrefs();}
+else if(!prefs.homeLayoutIntroduced)prefs.layout='home';
+if(!prefs.homeLayoutIntroduced){prefs.homeLayoutIntroduced=true;prefs.chart='line';savePrefs();}
+render();
